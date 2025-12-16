@@ -1,3 +1,5 @@
+pyserial 
+pynmea2
 dataclasses
 Jetson.GPIO
 requests

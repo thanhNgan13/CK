@@ -6,7 +6,7 @@ import threading
 import time
 
 class FirebaseService:
-    def __init__(self, cred_path, device_id="jetson-nano-1", audio_service=None):
+    def __init__(self, cred_path, device_id="jetson-nano-iot", audio_service=None):
         self.device_id = device_id
         self.audio_service = audio_service
         self.db = None
