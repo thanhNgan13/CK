@@ -9,8 +9,12 @@ class AudioService:
         self.current_priority = float('inf')
         self.lock = threading.Lock()
         
-        # Initialize pygame mixer
-        pygame.mixer.init()
+        # Initialize pygame mixer with larger buffer to reduce ALSA underrun
+        try:
+            pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
+        except Exception as e:
+            print(f"[AudioService] Warning: Custom mixer init failed, falling back to default. {e}")
+            pygame.mixer.init()
         
         # Map behavior and level to filenames
         # behavior: { level: filename } or just filename if no level
