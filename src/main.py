@@ -2,6 +2,7 @@ import os
 import time
 import signal
 import sys
+import subprocess
 from services.firebase_service import FirebaseService
 from services.audio_service import AudioService
 from services.led_service import LedService
@@ -16,6 +17,7 @@ def main():
     
     display_led_service = LedService()
     sos_service = SosService()
+    rtsp_process = None
     
     # Initialize Audio Service
     audio_service = AudioService(assets_path=ASSETS_PATH, led_service=display_led_service)
@@ -28,6 +30,11 @@ def main():
         
         # Start SOS Service (Button Monitor)
         sos_service.start()
+        
+        # Start RTSP Camera Process
+        print("[Main] Launching RTSP Server...")
+        rtsp_process = subprocess.Popen([sys.executable, "src/jetson_usb_rtsp_simple.py"])
+        print(f"[Main] RTSP Server started with PID: {rtsp_process.pid}")
         
     except Exception as e:
         print(f"Failed to initialize Firebase Service: {e}")
@@ -44,6 +51,15 @@ def main():
         print("\nStopping Device Client...")
         display_led_service.cleanup()
         sos_service.stop()
+        
+        if rtsp_process:
+            print("[Main] Terminating RTSP Server...")
+            rtsp_process.terminate()
+            try:
+                rtsp_process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                rtsp_process.kill()
+        
         sys.exit(0)
 
 if __name__ == "__main__":
