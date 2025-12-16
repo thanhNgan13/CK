@@ -26,7 +26,7 @@ def main():
     print(f"[Sim] Creating/Updating user {USER_ID}...")
     user_ref = db.collection("users").document(USER_ID)
     user_ref.set({
-        "username": "Test User Simulation",
+        "fullName": "Test User Simulation",
         "createdAt": datetime.datetime.now()
     }, merge=True)
 
