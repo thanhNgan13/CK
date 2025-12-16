@@ -1,2 +1,5 @@
+dataclasses
+Jetson.GPIO
+requests
 firebase-admin
 pygame
