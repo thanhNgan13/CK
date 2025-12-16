@@ -1,11 +1,45 @@
 import Jetson.GPIO as GPIO
 import time
+from gtts import gTTS
+import pygame
+import os
+import tempfile
 
 # Pin definition
 PINS = [32, 33, 35, 36, 37]
 
+def speak(text):
+    """Generates and plays TTS audio."""
+    try:
+        print(f"[TTS] {text}")
+        tts = gTTS(text=text, lang='vi')
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as fp:
+            temp_path = fp.name
+            tts.save(temp_path)
+        
+        pygame.mixer.music.load(temp_path)
+        pygame.mixer.music.play()
+        while pygame.mixer.music.get_busy():
+             time.sleep(0.1)
+        
+        # Clean up
+        pygame.mixer.music.unload() # Ensure file is released
+        try:
+            os.remove(temp_path)
+        except:
+            pass
+    except Exception as e:
+        print(f"[TTS Error] {e}")
+
 def test_leds():
     print("Checking GPIO setup...")
+    # Init Audio
+    try:
+        pygame.mixer.init()
+    except Exception as e:
+        print(f"Audio Init Failed: {e}")
+
+    # Init GPIO
     try:
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(PINS, GPIO.OUT, initial=GPIO.LOW)
@@ -17,22 +51,23 @@ def test_leds():
     print("Press Ctrl+C to stop.\n")
 
     try:
-        # Round 1: Individual Check
-        for pin in PINS:
-            print(f"Testing Pin {pin} (ON)...")
+        for i, pin in enumerate(PINS):
+            text = f"Đang kiểm tra đèn thứ {i+1}, chân số {pin}"
+            speak(text)
+            
+            print(f"--> Turning ON Pin {pin}")
             GPIO.output(pin, GPIO.HIGH)
-            time.sleep(1)
+            time.sleep(3) # Keep ON for 3 seconds to observe
+            
+            print(f"<-- Turning OFF Pin {pin}")
             GPIO.output(pin, GPIO.LOW)
-            time.sleep(0.5)
-        
-        # Round 2: All ON
-        print("Turning ALL LEDs ON...")
-        GPIO.output(PINS, GPIO.HIGH)
-        time.sleep(2)
-        print("Turning ALL LEDs OFF...")
-        GPIO.output(PINS, GPIO.LOW)
+            
+            if i < len(PINS) - 1:
+                print("Waiting 10s before next LED...")
+                time.sleep(10)
         
         print("\nTest Complete!")
+        speak("Đã hoàn thành kiểm tra")
 
     except KeyboardInterrupt:
         print("\nTest interrupted.")
