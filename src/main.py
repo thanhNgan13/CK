@@ -4,6 +4,7 @@ import signal
 import sys
 from services.firebase_service import FirebaseService
 from services.audio_service import AudioService
+from services.led_service import LedService
 
 # Config
 CRED_PATH = r"src/configs/lucky-union-472503-c7-firebase-adminsdk-fbsvc-708fc927d9.json"
@@ -12,8 +13,10 @@ ASSETS_PATH = r"assets/audios"
 def main():
     print("Starting Device Client...")
     
+    display_led_service = LedService()
+    
     # Initialize Audio Service
-    audio_service = AudioService(assets_path=ASSETS_PATH)
+    audio_service = AudioService(assets_path=ASSETS_PATH, led_service=display_led_service)
     
     # Initialize Firebase Service
     try:
@@ -33,6 +36,7 @@ def main():
             audio_service.check_status()
     except KeyboardInterrupt:
         print("\nStopping Device Client...")
+        display_led_service.cleanup()
         sys.exit(0)
 
 if __name__ == "__main__":

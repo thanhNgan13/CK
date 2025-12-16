@@ -3,8 +3,9 @@ import os
 import threading
 
 class AudioService:
-    def __init__(self, assets_path="assets/audios"):
+    def __init__(self, assets_path="assets/audios", led_service=None):
         self.assets_path = assets_path
+        self.led_service = led_service
         self.current_priority = float('inf')
         self.lock = threading.Lock()
         
@@ -63,6 +64,12 @@ class AudioService:
                 pygame.mixer.music.load(audio_path)
                 pygame.mixer.music.play()
                 
+                # Turn on LED for this file
+                if self.led_service:
+                    filename = os.path.basename(audio_path)
+                    print(f"[AudioService] LED Request: Turn on for {filename}")
+                    self.led_service.turn_on_file(filename)
+                
                 # Check for special case: sleepy_eye level 3 -> queue stop_car_warning
                 if behavior == "sleepy_eye" and str(level) == "3":
                     warning_path = os.path.join(self.assets_path, "stop_car_warning.wav")
@@ -87,6 +94,10 @@ class AudioService:
         with self.lock:
             if not pygame.mixer.music.get_busy():
                 self.current_priority = float('inf')
+                # Ensure LEDs are off if audio stopped
+                if self.led_service:
+                    self.led_service.stop_blinking()
+                    self.led_service.turn_off_all()
 
     def speak(self, text, priority=0, lang='vi'):
         """
@@ -122,6 +133,10 @@ class AudioService:
                 temp_file.close() # Close so gTTS can write to it
                 
                 tts.save(temp_path)
+                
+                
+                if self.led_service:
+                    self.led_service.start_blinking()
                 
                 pygame.mixer.music.load(temp_path)
                 pygame.mixer.music.play()
