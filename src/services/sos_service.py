@@ -56,7 +56,14 @@ class SosService:
         
         # Init GPIO
         try:
-            GPIO.setmode(GPIO.BOARD)
+            cur_mode = GPIO.getmode()
+            if cur_mode is None:
+                GPIO.setmode(GPIO.BOARD)
+            elif cur_mode != GPIO.BOARD:
+                try:
+                    GPIO.setmode(GPIO.BOARD)
+                except: pass
+
             # Input button with pull-up resistor (hardware)
             GPIO.setup(self.BUTTON_PIN, GPIO.IN) 
             # Status LED

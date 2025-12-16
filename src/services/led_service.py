@@ -47,7 +47,19 @@ class LedService:
         
         # Initialize GPIO
         try:
-            GPIO.setmode(GPIO.BOARD)
+            cur_mode = GPIO.getmode()
+            if cur_mode is None:
+                GPIO.setmode(GPIO.BOARD)
+            elif cur_mode != GPIO.BOARD:
+                print(f"[LedService] Warning: GPIO mode is {cur_mode}, expected BOARD ({GPIO.BOARD})")
+                # Attempt to set it anyway or trust it? Safer to try setting or erroring.
+                # If we are sharing with something else setting BCM, we are in trouble.
+                # Asking for BOARD.
+                try:
+                     GPIO.setmode(GPIO.BOARD)
+                except Exception as e:
+                     print(f"[LedService] Could not switch mode: {e}")
+
             for pin in self.all_pins:
                 GPIO.setup(pin, GPIO.OUT, initial=GPIO.LOW)
             
