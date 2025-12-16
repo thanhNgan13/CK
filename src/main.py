@@ -33,8 +33,11 @@ def main():
         
         # Start RTSP Camera Process
         print("[Main] Launching RTSP Server...")
-        rtsp_process = subprocess.Popen([sys.executable, "src/jetson_usb_rtsp_simple.py"])
-        print(f"[Main] RTSP Server started with PID: {rtsp_process.pid}")
+        # CRITICAL: Use /usr/bin/python3 to access system GStreamer libraries (GI)
+        # Virtualenvs often miss these bindings.
+        python_exec = "/usr/bin/python3" if os.path.exists("/usr/bin/python3") else sys.executable
+        rtsp_process = subprocess.Popen([python_exec, "src/jetson_usb_rtsp_simple.py"])
+        print(f"[Main] RTSP Server started with PID: {rtsp_process.pid} using {python_exec}")
         
     except Exception as e:
         print(f"Failed to initialize Firebase Service: {e}")
