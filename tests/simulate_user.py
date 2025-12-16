@@ -6,7 +6,7 @@ import datetime
 
 # Config
 CRED_PATH = r"src/configs/lucky-union-472503-c7-firebase-adminsdk-fbsvc-708fc927d9.json"
-DEVICE_ID = "jetson-nano-1"
+DEVICE_ID = "jetson-nano-iot-test"
 USER_ID = "test_user_sim"
 
 def main():
@@ -39,8 +39,8 @@ def main():
         "linkedAt": datetime.datetime.now().isoformat()
     }, merge=True)
     
-    print("[Sim] Device linked. Waiting 5 seconds for main app to pick it up...")
-    time.sleep(5)
+    print("[Sim] Device linked. Waiting 15 seconds for main app to pick it up...")
+    time.sleep(15)
 
     # 3. Mock Behaviors
     histories_ref = user_ref.collection("histories")

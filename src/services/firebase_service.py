@@ -6,13 +6,15 @@ import threading
 import time
 
 class FirebaseService:
-    def __init__(self, cred_path, device_id="jetson-nano-iot", audio_service=None):
+    def __init__(self, cred_path, device_id="jetson-nano-iot-test", audio_service=None):
         self.device_id = device_id
         self.audio_service = audio_service
         self.db = None
         self.linked_user_id = None
         self.user_listener = None
         self.histories_listener = None
+        self.is_first_load = True # Flag to track startup status
+        self.listen_start_time = None 
         
         # Initialize Firebase
         try:
@@ -102,9 +104,11 @@ class FirebaseService:
                 self.linked_user_id = new_linked_user_id
                 print(f"[FirebaseService] Linked User ID changed to: {self.linked_user_id}")
                 
+                print(f"[FirebaseService] Linked User ID changed to: {self.linked_user_id}")
+                
                 # If we have a user, start listening to their histories
                 if self.linked_user_id:
-                    self._fetch_user_info()
+                    self._fetch_user_info(is_startup=self.is_first_load)
                     self._listen_to_histories()
                 else:
                     # Stop listening if unlinked
@@ -113,11 +117,33 @@ class FirebaseService:
                         self.histories_listener = None
                         print("[FirebaseService] Unlinked. Stopped listening to histories.")
 
-    def _fetch_user_info(self):
+        # After processing the snapshot, update first load flag
+        self.is_first_load = False
+
+    def _fetch_user_info(self, is_startup=False):
         try:
+            print(f"[FirebaseService] Fetching info for user: {self.linked_user_id}")
             user_doc = self.db.collection("users").document(self.linked_user_id).get()
             if user_doc.exists:
-                print(f"[FirebaseService] User Info: {user_doc.to_dict()}")
+                data = user_doc.to_dict()
+                print(f"[FirebaseService] User Info: {data}")
+                
+                full_name = data.get("fullName", "bạn")
+                
+                message = ""
+                if is_startup:
+                    # Startup message
+                    message = f"Chào mừng {full_name} trở lại, chúc bạn có chuyến đi vui vẻ và bình an"
+                else:
+                    # Realtime message
+                    message = f"Chào mừng {full_name} đến với hệ thống, chúc bạn có chuyến đi vui vẻ và bình an"
+                
+                print(f"[FirebaseService] Playing TTS: {message}")
+                if self.audio_service:
+                    # Use a low priority (e.g., 10) so it doesn't override critical warnings (priority 1 or 2)
+                    # But ensures it plays if nothing else is playing.
+                    self.audio_service.speak(message, priority=10, lang='vi')
+                    
             else:
                 print(f"[FirebaseService] User {self.linked_user_id} not found in 'users' collection.")
         except Exception as e:
@@ -128,6 +154,11 @@ class FirebaseService:
             self.histories_listener.unsubscribe()
             
         histories_ref = self.db.collection("users").document(self.linked_user_id).collection("histories")
+        
+        # Set start time for filtering (UTC to match Firestore)
+        self.listen_start_time = datetime.datetime.now(datetime.timezone.utc)
+        print(f"[FirebaseService] Listening to histories from: {self.listen_start_time}")
+
         # Listen for new additions
         self.histories_listener = histories_ref.on_snapshot(self._on_histories_snapshot)
         print(f"[FirebaseService] Listening to histories for user {self.linked_user_id}...")
@@ -136,6 +167,18 @@ class FirebaseService:
         for change in changes:
             if change.type.name == 'ADDED':
                 data = change.document.to_dict()
+                
+                # Use server-side create_time for filtering
+                create_time = change.document.create_time
+                
+                # Check if this is a historical alert
+                if self.listen_start_time and create_time:
+                   # Ensure both are offset-aware for comparison. 
+                   # listen_start_time is UTC. create_time should be UTC.
+                   if create_time < self.listen_start_time:
+                       print(f"[FirebaseService] Ignoring historical alert (Created: {create_time} vs Start: {self.listen_start_time})")
+                       continue
+                
                 print(f"[FirebaseService] New history added: {data}")
                 
                 behavior = data.get("behavior")

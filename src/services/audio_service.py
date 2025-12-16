@@ -87,3 +87,51 @@ class AudioService:
         with self.lock:
             if not pygame.mixer.music.get_busy():
                 self.current_priority = float('inf')
+
+    def speak(self, text, priority=0, lang='vi'):
+        """
+        Generates TTS audio and plays it.
+        """
+        from gtts import gTTS
+        import tempfile
+        
+        with self.lock:
+            print(f"[AudioService] Request to speak: '{text}' (p={priority})")
+            
+            if pygame.mixer.music.get_busy():
+                if priority < self.current_priority:
+                     print(f"[AudioService] Interrupting current sound for TTS")
+                     pygame.mixer.music.stop()
+                else:
+                     print(f"[AudioService] TTS ignored due to lower priority")
+                     return
+
+            try:
+                # Generate TTS
+                tts = gTTS(text=text, lang=lang)
+                
+                # Save to a named temp file that we can read
+                # gTTS write_to_fp might be better but pygame needs a file usually
+                # On windows, tempfile with delete=True sometimes causes permission issues if still open
+                # So we use delete=False and generic name?
+                # Or just use a fixed temp file name in assets maybe to be safe on Windows?
+                # Let's try tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
+                
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
+                temp_path = temp_file.name
+                temp_file.close() # Close so gTTS can write to it
+                
+                tts.save(temp_path)
+                
+                pygame.mixer.music.load(temp_path)
+                pygame.mixer.music.play()
+                
+                self.current_priority = priority
+                
+                # We can't easily delete the file while it's playing in pygame on Windows.
+                # It might remain until next restart or be overwritten. 
+                # For this simple project, letting OS clean temp or overwriting same path is acceptable.
+                
+            except Exception as e:
+                print(f"[AudioService] Error in speak: {e}")
+                self.current_priority = float('inf')

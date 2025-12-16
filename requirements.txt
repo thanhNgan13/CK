@@ -5,3 +5,4 @@ Jetson.GPIO
 requests
 firebase-admin
 pygame
+gTTS
