@@ -96,7 +96,7 @@ class AudioService:
                 self.current_priority = float('inf')
                 # Ensure LEDs are off if audio stopped
                 if self.led_service:
-                    self.led_service.stop_blinking()
+                    self.led_service.stop_effect()
                     self.led_service.turn_off_all()
 
     def speak(self, text, priority=0, lang='vi'):
@@ -136,7 +136,7 @@ class AudioService:
                 
                 
                 if self.led_service:
-                    self.led_service.start_blinking()
+                    self.led_service.start_chasing()
                 
                 pygame.mixer.music.load(temp_path)
                 pygame.mixer.music.play()

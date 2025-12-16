@@ -38,9 +38,11 @@ class LedService:
             "look_away.wav": 37
         }
         self.all_pins = list(self.pins_map.values())
+        # Order for chase effect: 32 -> 33 -> 35 -> 36 -> 37
+        self.sorted_pins = sorted(self.all_pins)
         
-        self.is_blinking = False
-        self.blink_thread = None
+        self.is_running_effect = False
+        self.effect_thread = None
         self.lock = threading.Lock()
         
         # Initialize GPIO
@@ -48,13 +50,17 @@ class LedService:
             GPIO.setmode(GPIO.BOARD)
             for pin in self.all_pins:
                 GPIO.setup(pin, GPIO.OUT, initial=GPIO.LOW)
+            
+            # CRITICAL: Ensure all lights are OFF immediately on startup
+            self.turn_off_all()
+            
             print("[LedService] Initialized GPIO pins: ", self.all_pins)
         except Exception as e:
             print(f"[LedService] GPIO Init Error: {e}")
 
     def turn_on_file(self, filename):
         """Turns on the LED corresponding to the filename, turns others off."""
-        self.stop_blinking()
+        self.stop_effect()
         
         target_pin = self.pins_map.get(filename)
         if not target_pin:
@@ -73,53 +79,68 @@ class LedService:
 
     def turn_off_all(self):
         """Turns off all mapped LEDs."""
-        with self.lock:
-            for pin in self.all_pins:
-                GPIO.output(pin, GPIO.LOW)
-
-    def start_blinking(self):
-        """Starts blinking all LEDs (for TTS)."""
-        if self.is_blinking:
-            return
-            
-        print("[LedService] Starting blink mode...")
-        self.is_blinking = True
-        self.blink_thread = threading.Thread(target=self._blink_loop)
-        self.blink_thread.daemon = True
-        self.blink_thread.start()
-
-    def stop_blinking(self):
-        """Stops the blinking thread."""
-        if not self.is_blinking:
-            return
-            
-        self.is_blinking = False
-        if self.blink_thread and self.blink_thread.is_alive():
-            self.blink_thread.join(timeout=1.0)
-        self.blink_thread = None
-        self.turn_off_all()
-        print("[LedService] Stopped blink mode.")
-
-    def _blink_loop(self):
-        """Thread loop for blinking."""
-        state = GPIO.HIGH
-        while self.is_blinking:
+        try:
             with self.lock:
                 for pin in self.all_pins:
-                    GPIO.output(pin, state)
+                    GPIO.output(pin, GPIO.HIGH) # According to some active-low setups, but usually LOW is OFF.
+                    # Wait, user said "cắm điện vào thì các đèn lại sáng lên" -> implies they might be active LOW or just floating HIGH.
+                    # BUT usually GPIO.LOW is 0V (OFF).
+                    # If the user says "plug in and they light up", maybe the initialized state was wrong or they are Active LOW relays?
+                    # "phát sáng đèn tương ứng là được" -> indicates positive logic usually.
+                    # Let's assume High=On, Low=Off.
+                    # If they were ON at startup, maybe GPIO.setup defaults?
+                    # The previous code had `initial=GPIO.LOW`.
+                    # I will stick to LOW = OFF.
+                    GPIO.output(pin, GPIO.LOW)
+        except Exception as e:
+            print(f"[LedService] Error turning off: {e}")
+
+    def start_chasing(self):
+        """Starts the running light (chase) effect for TTS."""
+        if self.is_running_effect:
+            return
             
-            # Use small sleeps to check stop condition frequently
-            for _ in range(5): # 0.5s total (5 * 0.1)
-                if not self.is_blinking: break
-                time.sleep(0.1)
+        print("[LedService] Starting chase effect...")
+        self.is_running_effect = True
+        self.effect_thread = threading.Thread(target=self._chase_loop)
+        self.effect_thread.daemon = True
+        self.effect_thread.start()
+
+    def stop_effect(self):
+        """Stops any running effect (blink/chase)."""
+        if not self.is_running_effect:
+            return
             
-            state = GPIO.LOW if state == GPIO.HIGH else GPIO.HIGH
+        self.is_running_effect = False
+        if self.effect_thread and self.effect_thread.is_alive():
+            self.effect_thread.join(timeout=1.0)
+        self.effect_thread = None
+        self.turn_off_all()
+        print("[LedService] Stopped effect.")
+
+    def _chase_loop(self):
+        """Thread loop for chase effect."""
+        idx = 0
+        while self.is_running_effect:
+            target_pin = self.sorted_pins[idx]
+            
+            with self.lock:
+                for pin in self.all_pins:
+                    # Only the target pin is ON, others OFF
+                    GPIO.output(pin, GPIO.HIGH if pin == target_pin else GPIO.LOW)
+            
+            # Speed of chase: 0.1s per LED
+            for _ in range(2): # 0.1s total (2 * 0.05)
+                if not self.is_running_effect: break
+                time.sleep(0.05)
+            
+            idx = (idx + 1) % len(self.sorted_pins)
         
         # Ensure off when exiting loop
         self.turn_off_all()
 
     def cleanup(self):
-        self.stop_blinking()
+        self.stop_effect()
         try:
             GPIO.cleanup()
             print("[LedService] GPIO Cleaned up.")
