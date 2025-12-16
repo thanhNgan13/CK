@@ -5,6 +5,7 @@ import sys
 from services.firebase_service import FirebaseService
 from services.audio_service import AudioService
 from services.led_service import LedService
+from services.sos_service import SosService
 
 # Config
 CRED_PATH = r"src/configs/lucky-union-472503-c7-firebase-adminsdk-fbsvc-708fc927d9.json"
@@ -14,6 +15,7 @@ def main():
     print("Starting Device Client...")
     
     display_led_service = LedService()
+    sos_service = SosService()
     
     # Initialize Audio Service
     audio_service = AudioService(assets_path=ASSETS_PATH, led_service=display_led_service)
@@ -23,6 +25,10 @@ def main():
         firebase_service = FirebaseService(cred_path=CRED_PATH, audio_service=audio_service)
         firebase_service.initialize_device()
         firebase_service.start_listening()
+        
+        # Start SOS Service (Button Monitor)
+        sos_service.start()
+        
     except Exception as e:
         print(f"Failed to initialize Firebase Service: {e}")
         return
@@ -37,6 +43,7 @@ def main():
     except KeyboardInterrupt:
         print("\nStopping Device Client...")
         display_led_service.cleanup()
+        sos_service.stop()
         sys.exit(0)
 
 if __name__ == "__main__":
